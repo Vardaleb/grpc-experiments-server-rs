@@ -9,6 +9,15 @@ edition = "2021"
 tonic = "0.11"
 prost = "0.12"
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+tokio-stream = "0.1"
 
 [build-dependencies]
 tonic-build = "0.11"
+
+[[bin]] # Bin to run the  gRPC server
+name = "server"
+path = "src/server.rs"
+
+[[bin]] # Bin to run the  gRPC client
+name = "client"
+path = "src/client.rs"
