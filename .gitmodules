@@ -1,6 +1,3 @@
-[submodule "grpc-experiments-server-rs"]
-	path = grpc-experiments-server-rs
-	url = git@github.com:Vardaleb/grpc-experiments-server-rs.git
 [submodule "grpc-experiments-messages"]
 	path = grpc-experiments-messages
 	url = git@github.com:Vardaleb/grpc-experiments-messages.git
