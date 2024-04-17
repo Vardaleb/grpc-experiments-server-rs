@@ -1,11 +1,9 @@
 use std::{io::stdin, process::exit};
 
-use demoservice::{demo_service_client::DemoServiceClient, DemoRequest};
+use demo::{demo_service_client::DemoServiceClient, DemoRequest};
 use tonic::{transport::Channel, Request};
 
-pub mod demoservice {
-    tonic::include_proto!("demo");
-}
+pub mod demo;
 
 async fn call_unary(
     client: &mut DemoServiceClient<Channel>,

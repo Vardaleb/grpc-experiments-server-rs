@@ -1,24 +1,12 @@
 use std::pin::Pin;
-
-use demoservice::{
-    demo_service_server::{DemoService, DemoServiceServer},
-    DemoRequest, DemoResponse,
-};
 use tokio_stream::{wrappers::ReceiverStream, Stream, StreamExt};
 use tonic::{transport::Server, Request, Response, Status, Streaming};
 
-pub mod demoservice {
-    tonic::include_proto!("demo");
-}
-
-#[derive(Debug, Default)]
-pub struct DemoServiceImpl {}
-
-impl DemoServiceImpl {
-    pub fn new() -> DemoServiceImpl {
-        DemoServiceImpl {}
-    }
-}
+pub mod demo;
+use demo::{
+    demo_service_server::{DemoService, DemoServiceServer},
+    DemoRequest, DemoResponse,
+};
 
 fn get_random_strings() -> Vec<String> {
     let mut rng = rand::thread_rng();
@@ -33,21 +21,38 @@ fn get_random_strings() -> Vec<String> {
     letters
 }
 
+#[derive(Debug, Default)]
+pub struct DemoServiceImpl {}
+
 #[tonic::async_trait]
 impl DemoService for DemoServiceImpl {
-    // rpc Unary(DemoRequest) returns (DemoResponse);
+    /// A unary gRPC function.
+    /// 
+    /// From the service defintion:
+    /// ```proto
+    /// service DemoService {
+    ///   rpc Unary(DemoRequest) returns (DemoResponse);
+    /// }
+    /// ```
     async fn unary(&self, request: Request<DemoRequest>) -> Result<Response<DemoResponse>, Status> {
         println!("Got unary request {:?}", request);
 
         let query = request.into_inner().query;
-        let reply = demoservice::DemoResponse {
+        let reply = demo::DemoResponse {
             result: format!("Result for {}", query),
         };
 
         Ok(Response::new(reply))
     }
 
-    // rpc ServerStreaming(DemoRequest) returns (stream DemoResponse);
+    /// A server streaming gRPC function.
+    /// 
+    /// From the service defintion:
+    /// ```proto
+    /// service DemoService {
+    ///   rpc ServerStreaming(DemoRequest) returns (stream DemoResponse);
+    /// }
+    /// ```
     type ServerStreamingStream = ReceiverStream<Result<DemoResponse, Status>>;
     async fn server_streaming(
         &self,
@@ -69,7 +74,14 @@ impl DemoService for DemoServiceImpl {
         Ok(Response::new(ReceiverStream::new(rx)))
     }
 
-    // rpc ClientStreaming(stream DemoRequest) returns (DemoResponse);
+    /// A client streaming gRPC function.
+    /// 
+    /// From the service defintion:
+    /// ```proto
+    /// service DemoService {
+    ///   rpc ClientStreaming(stream DemoRequest) returns (DemoResponse);
+    /// }
+    /// ```
     async fn client_streaming(
         &self,
         request: Request<Streaming<DemoRequest>>,
@@ -86,12 +98,19 @@ impl DemoService for DemoServiceImpl {
             result.push_str(&format!("{}", element.query));
         }
 
-        let reply = demoservice::DemoResponse { result };
+        let reply = demo::DemoResponse { result };
 
         Ok(Response::new(reply))
     }
 
-    // rpc BidirectionalStreaming(stream DemoRequest) returns (stream DemoResponse);
+    /// A bidirectional streaming gRPC function.
+    /// 
+    /// From the service defintion:
+    /// ```proto
+    /// service DemoService {
+    ///   rpc BidirectionalStreaming(stream DemoRequest) returns (stream DemoResponse);
+    /// }
+    /// ```
     type BidirectionalStreamingStream =
         Pin<Box<dyn Stream<Item = Result<DemoResponse, Status>> + Send + 'static>>;
     async fn bidirectional_streaming(
