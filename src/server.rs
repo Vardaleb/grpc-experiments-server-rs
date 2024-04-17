@@ -33,7 +33,6 @@ fn get_random_strings() -> Vec<String> {
     letters
 }
 
-#[allow(unused)]
 #[tonic::async_trait]
 impl DemoService for DemoServiceImpl {
     // rpc Unary(DemoRequest) returns (DemoResponse);
@@ -56,7 +55,7 @@ impl DemoService for DemoServiceImpl {
     ) -> Result<Response<Self::ServerStreamingStream>, Status> {
         println!("Got server streaming request {:?}", request);
 
-        let (mut tx, rx) = tokio::sync::mpsc::channel(4);
+        let (tx, rx) = tokio::sync::mpsc::channel(4);
         tokio::spawn(async move {
             for letter in get_random_strings() {
                 tx.send(Ok(DemoResponse {
