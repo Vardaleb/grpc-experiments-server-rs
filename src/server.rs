@@ -1,11 +1,10 @@
-use std::{pin::Pin, sync::Arc};
+use std::pin::Pin;
 
 use demoservice::{
     demo_service_server::{DemoService, DemoServiceServer},
     DemoRequest, DemoResponse,
 };
-use tokio::sync::Mutex;
-use tokio_stream::{wrappers::ReceiverStream, Stream};
+use tokio_stream::{wrappers::ReceiverStream, Stream, StreamExt};
 use tonic::{transport::Server, Request, Response, Status, Streaming};
 
 pub mod demoservice {
@@ -13,16 +12,25 @@ pub mod demoservice {
 }
 
 #[derive(Debug, Default)]
-pub struct DemoServiceImpl {
-    queries: Arc<Mutex<Vec<String>>>,
-}
+pub struct DemoServiceImpl {}
 
 impl DemoServiceImpl {
     pub fn new() -> DemoServiceImpl {
-        DemoServiceImpl {
-            queries: Arc::new(Mutex::new(Vec::new())),
-        }
+        DemoServiceImpl {}
     }
+}
+
+fn get_random_strings() -> Vec<String> {
+    let mut rng = rand::thread_rng();
+    let letters: Vec<String> = (0..5)
+        .map(|_| {
+            (0..10)
+                .map(|_| rand::Rng::sample(&mut rng, rand::distributions::Alphanumeric) as char)
+                .collect()
+        })
+        .collect();
+
+    letters
 }
 
 #[allow(unused)]
@@ -30,18 +38,13 @@ impl DemoServiceImpl {
 impl DemoService for DemoServiceImpl {
     // rpc Unary(DemoRequest) returns (DemoResponse);
     async fn unary(&self, request: Request<DemoRequest>) -> Result<Response<DemoResponse>, Status> {
-        println!("Got request {:?}", request);
+        println!("Got unary request {:?}", request);
 
         let query = request.into_inner().query;
-        // remember query
-        let mut lock = self.queries.lock().await;
-        lock.push(query.clone());
-
         let reply = demoservice::DemoResponse {
             result: format!("Result for {}", query),
         };
 
-        println!("Queries so far: {:?}", lock);
         Ok(Response::new(reply))
     }
 
@@ -51,16 +54,13 @@ impl DemoService for DemoServiceImpl {
         &self,
         request: Request<DemoRequest>,
     ) -> Result<Response<Self::ServerStreamingStream>, Status> {
-        println!("Got request {:?}", request);
+        println!("Got server streaming request {:?}", request);
 
         let (mut tx, rx) = tokio::sync::mpsc::channel(4);
-
-        let queries = self.queries.lock().await.clone();
-
         tokio::spawn(async move {
-            for query in queries.iter() {
+            for letter in get_random_strings() {
                 tx.send(Ok(DemoResponse {
-                    result: query.clone(),
+                    result: String::from(letter),
                 }))
                 .await
                 .unwrap();
@@ -75,7 +75,21 @@ impl DemoService for DemoServiceImpl {
         &self,
         request: Request<Streaming<DemoRequest>>,
     ) -> Result<Response<DemoResponse>, Status> {
-        unimplemented!()
+        println!("Got client streaming request {:?}", request);
+        let mut result = String::new();
+        let mut stream = request.into_inner();
+        while let Some(element) = stream.next().await {
+            if !result.is_empty() {
+                result.push(',');
+            }
+
+            let element = element?;
+            result.push_str(&format!("{}", element.query));
+        }
+
+        let reply = demoservice::DemoResponse { result };
+
+        Ok(Response::new(reply))
     }
 
     // rpc BidirectionalStreaming(stream DemoRequest) returns (stream DemoResponse);
@@ -85,7 +99,22 @@ impl DemoService for DemoServiceImpl {
         &self,
         request: Request<Streaming<DemoRequest>>,
     ) -> Result<Response<Self::BidirectionalStreamingStream>, Status> {
-        unimplemented!()
+        let mut stream = request.into_inner();
+
+        let output = async_stream::try_stream! {
+            while let Some(request) = stream.next().await {
+                let request = request?;
+                let response = DemoResponse {
+                    result: request.query.to_uppercase(),
+                };
+
+                yield response;
+            }
+        };
+
+        Ok(Response::new(
+            Box::pin(output) as Self::BidirectionalStreamingStream
+        ))
     }
 }
 
